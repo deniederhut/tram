@@ -1,0 +1,29 @@
+
+language : python
+sudo : false
+cache : false
+python :
+    - "2.7"
+    - "3.5"
+    - "3.6"
+
+install :
+    - pip install .
+    - python setup.py install
+
+matrix :
+    include :
+        - os : linux
+          dist : trusty
+          sudo : required
+          python : 2.7
+        - os : linux
+          dist : trusty
+          sudo : required
+          python : 3.5
+        - os : linux
+          dist : trusty
+          sudo : required
+          python : 3.6
+
+script : py.test
