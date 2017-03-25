@@ -9,12 +9,16 @@ import sys
 Record = namedtuple('Record', 'instance value version'.split())
 
 def atomic(fun, *args, **kwargs):
+    """Decorator that wraps a function literal for modifying data inside of
+    generators acting on the instance-data pairs used by the transaction
+    """
     def new_fun(instance_list, read_list):
         return (
             (instance, fun(data, *args, **kwargs))
             for instance, data in zip(instance_list, read_list)
         )
     return new_fun
+
 
 class ValidationError(Exception):
     """Raised when a log fails to validate"""
@@ -27,19 +31,7 @@ class SuccessError(Exception):
 
 
 class Action:
-    """An class whose public methods are transactions
-
-    The public methods of this class expect to see sequences of tuples, where
-    the objects in those tuples either implement the Atomic interface or are
-    themselves immutable.
-
-    - self.set implements overwrites
-    - self.update does in-place addition
-    - self.transfer moves values from one instance to another
-
-    This class implements the STM TL2 algorithm (the logic is mostly contained
-    in cls.transaction). Primary differences between other threadsafe
-    algorithms include non-locking reads and dynamically available writes.
+    """Object which implements TL2 algorithm
     """
 
     def __init__(self, retries=100, sleep=0):
@@ -135,7 +127,8 @@ class Action:
 class HasTram:
     """An Tobject with version and lock attributes"""
 
-    def __init__(self):
+    def __init__(self, data=None):
+        self.data = data
         self._locked = False
         self._version = time.time()
 
@@ -209,13 +202,17 @@ class HasTram:
 
     @property
     def data(self):
-        raise NotImplementedError("{} is meant to be subclassed".format(self.__class__.__name__))
+        return self._data
 
     @data.setter
     def data(self, item):
-        raise NotImplementedError("{} is meant to be subclassed".format(self.__class__.__name__))
+        self._data = item
 
     def clear(self):
+        """Sets instance data to be cls()
+
+        This is typically a falsey value, like 0 or []
+        """
         @atomic
         def fun(*args, **kwargs):
             return type(self.data()())
@@ -234,6 +231,9 @@ class List(HasTram):
 
     def __len__(self):
         return len(self.data)
+
+    def __iter__(self):
+        return iter(self.data.copy())
 
     def __add__(self, other):
         if isinstance(other, self.__class__):
@@ -283,6 +283,21 @@ class List(HasTram):
 
     def count(self, item):
         return self.data.count(item)
+
+    def ifilter(self, function):
+        @atomic
+        def fun(data):
+            return filter(function, data)
+        do = Action()
+        do.transaction(self.data, write_action=fun)
+
+    def imap(self, function, *args, **kwargs):
+        @atomic
+        def fun(data):
+            nonlocal args, kwargs
+            return function(data, *args, **kwargs)
+        do = Action()
+        do.transaction(*self.data, write_action=fun)
 
     def index(self, item, *args):
         return self.data.index(item, *args)
@@ -338,9 +353,6 @@ class List(HasTram):
         do = Action()
         do.transaction(self, write_action=fun)
 
-    def unsafe_iter(self):
-        return iter(self.data)
-
 
 class Dict(HasTram):
 
@@ -354,6 +366,9 @@ class Dict(HasTram):
         else:
             data = None
         self.data = data
+
+    def __iter__(self):
+        return iter(self.keys())
 
     def __getitem__(self, key):
         try:
@@ -416,9 +431,6 @@ class Dict(HasTram):
             return result
         do = Action()
         do.transaction(self, write_action=fun)
-
-    def unsafe_iter(self):
-        return iter(self.data)
 
     def values(self):
         return list(self.data.values())

@@ -29,9 +29,9 @@ def test_list_add():
     assert [0] + left == m.List([0, -1])
     assert left + [1] == m.List([-1, 1])
 
-def test_list_iter():
-    with pytest.raises(NotImplementedError):
-        iter(m.List())
+# def test_list_iter():
+#     with pytest.raises(NotImplementedError):
+#         iter(m.List())
 
 def test_list_mul():
     left = m.List([-1])
@@ -94,9 +94,10 @@ def test_list_extend():
     assert left == m.List([-1, 0, 1])
     assert id(left.data) != _id
 
-# def test_list_map():
-#     left = m.List([-1, 0])
-#     list(map(lambda x: x + 1, left))
+def test_list_imap():
+    left = m.List([m.HasTram(-1), m.HasTram(0)])
+    left.imap(lambda x: x + 1)
+    assert left == [0, 1]
 
 #######################
 # The dictionary object
@@ -135,9 +136,9 @@ def test_dict_delitem():
     assert left == m.Dict(two=2, three=3)
     assert id(left.data) != _id
 
-def test_dict_iter():
-    with pytest.raises(NotImplementedError):
-        iter(m.Dict())
+# def test_dict_iter():
+#     with pytest.raises(NotImplementedError):
+#         iter(m.Dict())
 
 def test_dict_fromkeys():
     left = m.Dict.fromkeys([1, 2], value=None)
