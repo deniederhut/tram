@@ -8,6 +8,14 @@ import sys
 
 Record = namedtuple('Record', 'instance value version'.split())
 
+def atomic(fun, *args, **kwargs):
+    def new_fun(instance_list, read_list):
+        return (
+            (instance, fun(data, *args, **kwargs))
+            for instance, data in zip(instance_list, read_list)
+        )
+    return new_fun
+
 class ValidationError(Exception):
     """Raised when a log fails to validate"""
     pass
@@ -34,7 +42,9 @@ class Action:
     algorithms include non-locking reads and dynamically available writes.
     """
 
-    sleep = 0
+    def __init__(self, retries=100, sleep=0):
+        self.retries = retries
+        self.sleep = sleep
 
     def __enter__(self):
         """initialize local logs"""
@@ -85,28 +95,21 @@ class Action:
         for instance in sorted(instance_list, key=id, reverse=True):
             instance.__exit__(None, None, None)
 
-    @staticmethod
-    def nada(instance_list, read_list):
-        """Convenience method to return data unchanged"""
-        return (
-            (instance, data)
-            for instance, data in zip(instance_list, read_list)
-        )
-
-    def transaction(self, *instance_list, read_action=None, write_action=nada, retries=100):
+    def transaction(self, *instance_list, write_action, read_action=None):
         """Conduct threadsafe operation"""
         if read_action is None:
             read_action = self.read
+        retries = self.retries
         time.sleep(self.sleep) # these are here for testing in threaded envs
         while retries:
             with self:
                 read_list = read_action(instance_list)
                 self.write(write_action(instance_list, read_list))
                 self.sequence_lock(instance_list)
-                time.sleep(self.sleep)
+                time.sleep(self.sleep) # for testing
                 try:
                     self.validate()
-                    time.sleep(self.sleep)
+                    time.sleep(self.sleep) # for testing
                     self.commit()
                 except ValidationError:
                     pass
@@ -164,22 +167,21 @@ class HasTram:
         return len(self.data)
 
     def __iadd__(self, other):
-        def funk(instance_list, read_list):
-            return (
-                (instance, data+other)
-                for instance, data in zip(instance_list, read_list)
-            )
+        @atomic
+        def fun(data, *args, **kwargs):
+            return data + other
         do = Action()
-        do.transaction(self, write_action=funk)
+        do.transaction(self, write_action=fun)
 
     def __imul__(self, other):
-        def funk(instance_list, read_list):
-            return (
-                (instance, data*other)
-                for instance, data in zip(instance_list, read_list)
-            )
+        @atomic
+        def fun(data, *args, **kwargs):
+            return data * other
         do = Action()
-        do.transaction(self, write_action=funk)
+        do.transaction(self, write_action=fun)
+
+    def __iter__(self):
+        raise NotImplementedError
 
     def __getitem__(self, index):
         return self.data[index]
@@ -213,12 +215,25 @@ class HasTram:
     def data(self, item):
         raise NotImplementedError("{} is meant to be subclassed".format(self.__class__.__name__))
 
+    def clear(self):
+        @atomic
+        def fun(*args, **kwargs):
+            return type(self.data()())
+        do = Action()
+        do.transaction(self, write_action=fun)
+
+    def copy(self):
+        return self.__class__(self.data)
+
 
 class List(HasTram):
 
     def __init__(self, data=None):
         super().__init__()
         self.data = data
+
+    def __len__(self):
+        return len(self.data)
 
     def __add__(self, other):
         if isinstance(other, self.__class__):
@@ -236,22 +251,18 @@ class List(HasTram):
     __rmul__ = __mul__
 
     def __setitem__(self, index, item):
-        def funk(instance_list, read_list):
-                return (
-                    (instance, data[ :index] + [item] + data[index+1: ])
-                    for instance, data in zip(instance_list, read_list)
-                )
+        @atomic
+        def fun(data, *args, **kwargs):
+            return data[ :index] + [item] + data[index+1: ]
         do = Action()
-        do.transaction(self, write_action=funk)
+        do.transaction(self, write_action=fun)
 
     def __delitem__(self, index):
-        def funk(instance_list, read_list):
-            return (
-                (instance, data[ :index] + data[index+1: ])
-                for instance, data in zip(instance_list, read_list)
-            )
+        @atomic
+        def fun(data):
+            return data[ :index] + data[index+1: ]
         do = Action()
-        do.transaction(self, write_action=funk)
+        do.transaction(self, write_action=fun)
 
     @property
     def data(self):
@@ -264,61 +275,150 @@ class List(HasTram):
         else:
             self._data = []
 
-    def index(self, item, *args):
-        return self.data.index(item, *args)
-
     def append(self, item):
         self.__iadd__([item])
 
+    def extend(self, other):
+        self.__iadd__(other)
+
+    def count(self, item):
+        return self.data.count(item)
+
+    def index(self, item, *args):
+        return self.data.index(item, *args)
+
     def insert(self, item, index):
-        if index < 0:
-            index = len(self.data) + index
-        def funk(instance_list, read_list):
-            return (
-                (instance, data[:index] + [item] + data[index:])
-                for instance, data in zip(instance_list, read_list)
-            )
+        @atomic
+        def fun(data):
+            nonlocal index, item
+            if index < 0:
+                index = len(data) + index
+            return data[ :index] + [item] + data[index: ]
         do = Action()
-        do.transaction(self, write_action=funk)
+        do.transaction(self, write_action=fun)
 
     def pop(self, index=-1):
         result = []
-        if index < 0:
-            index = len(self.data) + index
-        def funk(instance_list, read_list):
-            nonlocal result
-            for instance, data in zip(instance_list, read_list):
-                result.append(data[index])
-                yield (instance, data[ :index] + data[index+1: ])
+        @atomic
+        def fun(data, *args, **kwargs):
+            nonlocal index, result
+            if index < 0:
+                index = len(data) + index
+            result.append(data[index])
+            return data[ :index] + data[index+1: ]
         do = Action()
-        do.transaction(self, write_action=funk)
+        do.transaction(self, write_action=fun)
         if len(result) == 1:
             return result[0]
         else:
             return result
 
     def remove(self, item):
-        def funk(instance_list, read_list):
-            index = self.index(item)
-            return (
-                (instance, data[ :index] + data[index+1: ])
-                for instance, data in zip(instance_list, read_list)
-            )
+        @atomic
+        def fun(data):
+            nonlocal item
+            index = data.index(item)
+            return data[ :index] + data[index+1: ]
         do = Action()
-        do.transaction(self, write_action=funk)
+        do.transaction(self, write_action=fun)
+
+    def reverse(self, *args, **kwargs):
+        @atomic
+        def fun(data):
+            nonlocal args, kwargs
+            return reversed(data, *args, **kwargs)
+        do = Action()
+        do.transaction(self, write_action=fun)
 
     def sort(self, *args, **kwargs):
-        def funk(instance_list, read_list):
-            return (
-                (instance, sorted(data, *args, **kwargs))
-                for instance, data in zip(instance_list, read_list)
-            )
+        @atomic
+        def fun(data):
+            nonlocal args, kwargs
+            return sorted(data, *args, **kwargs)
         do = Action()
-        do.transaction(self, write_action=funk)
+        do.transaction(self, write_action=fun)
 
-    def extend(self, other):
-        self.__iadd__(other)
+    def unsafe_iter(self):
+        return iter(self.data)
 
 
 class Dict(HasTram):
-    pass
+
+    def __init__(*args, **kwargs):
+        self, *args = args
+        super(Dict, self).__init__()
+        if args:
+            data = args[0]
+        elif kwargs:
+            data = kwargs
+        else:
+            data = None
+        self.data = data
+
+    def __getitem__(self, key):
+        try:
+            return self.data[key]
+        except KeyError:
+            raise KeyError(key)
+
+    def __setitem__(self, key, item):
+        @atomic
+        def fun(data):
+            result = data.copy()
+            result.update({key : item})
+            return result
+        do = Action()
+        do.transaction(self, write_action=fun)
+
+    def __delitem__(self, key):
+        @atomic
+        def fun(data):
+            result = data.copy()
+            result.pop(key)
+            return result
+        do = Action()
+        do.transaction(self, write_action=fun)
+
+    @property
+    def data(self):
+        return self._data
+
+    @data.setter
+    def data(self, item):
+        if item:
+            self._data = dict(item)
+        else:
+            self._data = {}
+
+    @classmethod
+    def fromkeys(cls, iterable, value=None):
+        data = dict()
+        for key in iterable:
+            data[key] = value
+        return cls(data)
+
+    def get(self, key, default=None):
+        if key in self:
+            return self[key]
+        return default
+
+    def items(self):
+        return list(self.data.items())
+
+    def keys(self):
+        return list(self.data.keys())
+
+    def update(self, mapping):
+        @atomic
+        def fun(data):
+            result = data.copy()
+            result.update(mapping)
+            return result
+        do = Action()
+        do.transaction(self, write_action=fun)
+
+    def unsafe_iter(self):
+        return iter(self.data)
+
+    def values(self):
+        return list(self.data.values())
