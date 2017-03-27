@@ -29,10 +29,6 @@ def test_list_add():
     assert [0] + left == m.List([0, -1])
     assert left + [1] == m.List([-1, 1])
 
-# def test_list_iter():
-#     with pytest.raises(NotImplementedError):
-#         iter(m.List())
-
 def test_list_mul():
     left = m.List([-1])
     assert 3 * left == m.List([-1, -1, -1])
@@ -135,10 +131,6 @@ def test_dict_delitem():
     del left['one']
     assert left == m.Dict(two=2, three=3)
     assert id(left.data) != _id
-
-# def test_dict_iter():
-#     with pytest.raises(NotImplementedError):
-#         iter(m.Dict())
 
 def test_dict_fromkeys():
     left = m.Dict.fromkeys([1, 2], value=None)
