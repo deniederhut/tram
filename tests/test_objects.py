@@ -6,6 +6,127 @@ import pytest
 
 import tram.objects as m
 
+
+#################
+# The Int object
+#################
+
+def test_int_init():
+    i = m.Int(1.4)
+    assert i.data == 1
+
+def test_int_add():
+    i = m.Int(1)
+    assert i + 1 == 2
+    assert -1 + i == 0
+    i += 1
+    assert i == 2
+
+def test_int_sub():
+    i = m.Int(1)
+    assert i - 1 == 0
+    assert 0 - i == -1
+    i -= 1
+    assert i == 0
+
+def test_int_mul():
+    i = m.Int(1)
+    assert i * 2 == 2
+    assert 2 * i == 2
+    i *= 2
+    assert i == 2
+
+def test_int_truediv():
+    i = m.Int(5)
+    assert i / 2 == 2.5
+    assert 2 / i == 0.4
+    i /= 2
+    assert i == 2.5
+
+def test_int_floordiv():
+    i = m.Int(5)
+    assert i // 2 == 2
+    assert 2 // i == 0
+    i //= 2
+    assert i == 2
+
+def test_int_pow():
+    i = m.Int(2)
+    assert i ** 3 == 8
+    assert 3 ** i == 9
+    i **= 3
+    assert i == 8
+
+def test_int_contains():
+    i = m.Int()
+    with pytest.raises(NotImplementedError):
+        4 in i
+
+def test_int_len():
+    i = m.Int()
+    with pytest.raises(NotImplementedError):
+        len(i)
+
+#################
+# The Float object
+#################
+
+def test_float_init():
+    i = m.Float(1.4)
+    assert i.data == 1.4
+
+def test_float_add():
+    i = m.Float(1)
+    assert i + 1 == 2
+    assert -1 + i == 0
+    i += 1
+    assert i == 2
+
+def test_float_sub():
+    i = m.Float(1)
+    assert i - 1 == 0
+    assert 0 - i == -1
+    i -= 1
+    assert i == 0
+
+def test_float_mul():
+    i = m.Float(1)
+    assert i * 2 == 2
+    assert 2 * i == 2
+    i *= 2
+    assert i == 2
+
+def test_float_truediv():
+    i = m.Float(5)
+    assert i / 2 == 2.5
+    assert 2 / i == 0.4
+    i /= 2
+    assert i == 2.5
+
+def test_float_floordiv():
+    i = m.Float(5)
+    assert i // 2 == 2
+    assert 2 // i == 0
+    i //= 2
+    assert i == 2
+
+def test_float_pow():
+    i = m.Float(2)
+    assert i ** 3 == 8
+    assert 3 ** i == 9
+    i **= 3
+    assert i == 8
+
+def test_float_contains():
+    i = m.Float()
+    with pytest.raises(NotImplementedError):
+        4 in i
+
+def test_float_len():
+    i = m.Float()
+    with pytest.raises(NotImplementedError):
+        len(i)
+
 #################
 # The List object
 #################
