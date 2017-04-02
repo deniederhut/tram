@@ -19,43 +19,62 @@ def test_int_add():
     i = m.Int(1)
     assert i + 1 == 2
     assert -1 + i == 0
+    _id = id(i)
     i += 1
     assert i == 2
+    assert _id == id(i)
 
 def test_int_sub():
     i = m.Int(1)
     assert i - 1 == 0
     assert 0 - i == -1
+    _id = id(i)
     i -= 1
     assert i == 0
+    assert _id == id(i)
 
 def test_int_mul():
     i = m.Int(1)
     assert i * 2 == 2
     assert 2 * i == 2
+    _id = id(i)
     i *= 2
     assert i == 2
+    assert _id == id(i)
 
 def test_int_truediv():
     i = m.Int(5)
     assert i / 2 == 2.5
     assert 2 / i == 0.4
+    _id = id(i)
     i /= 2
     assert i == 2.5
+    assert _id == id(i)
 
 def test_int_floordiv():
     i = m.Int(5)
     assert i // 2 == 2
     assert 2 // i == 0
+    _id = id(i)
     i //= 2
     assert i == 2
+    assert _id == id(i)
 
 def test_int_pow():
     i = m.Int(2)
     assert i ** 3 == 8
     assert 3 ** i == 9
+    _id = id(i)
     i **= 3
     assert i == 8
+    assert _id == id(i)
+
+def test_int_clear():
+    i = m.Int(2)
+    _id = id(i)
+    i.clear()
+    assert i == 0
+    assert _id == id(i)
 
 def test_int_contains():
     i = m.Int()
@@ -79,43 +98,62 @@ def test_float_add():
     i = m.Float(1)
     assert i + 1 == 2
     assert -1 + i == 0
+    _id = id(i)
     i += 1
     assert i == 2
+    assert _id == id(i)
 
 def test_float_sub():
     i = m.Float(1)
     assert i - 1 == 0
     assert 0 - i == -1
+    _id = id(i)
     i -= 1
     assert i == 0
+    assert _id == id(i)
 
 def test_float_mul():
     i = m.Float(1)
     assert i * 2 == 2
     assert 2 * i == 2
+    _id = id(i)
     i *= 2
     assert i == 2
+    assert _id == id(i)
 
 def test_float_truediv():
     i = m.Float(5)
     assert i / 2 == 2.5
     assert 2 / i == 0.4
+    _id = id(i)
     i /= 2
     assert i == 2.5
+    assert _id == id(i)
 
 def test_float_floordiv():
     i = m.Float(5)
     assert i // 2 == 2
     assert 2 // i == 0
+    _id = id(i)
     i //= 2
     assert i == 2
+    assert _id == id(i)
 
 def test_float_pow():
     i = m.Float(2)
     assert i ** 3 == 8
     assert 3 ** i == 9
+    _id = id(i)
     i **= 3
     assert i == 8
+    assert _id == id(i)
+
+def test_float_clear():
+    i = m.Float(2)
+    _id = id(i)
+    i.clear()
+    assert i == 0.0
+    assert _id == id(i)
 
 def test_float_contains():
     i = m.Float()
@@ -149,6 +187,12 @@ def test_list_add():
     assert left + right == left
     assert [0] + left == m.List([0, -1])
     assert left + [1] == m.List([-1, 1])
+    instance_id = id(left)
+    data_id = id(left.data)
+    left += [0]
+    assert left == [-1, 0]
+    assert id(left) == instance_id
+    assert id(left.data) != data_id
 
 def test_list_mul():
     left = m.List([-1])
@@ -211,6 +255,21 @@ def test_list_extend():
     assert left == m.List([-1, 0, 1])
     assert id(left.data) != _id
 
+def test_list_copy():
+    left = m.List([-1])
+    right = left.copy()
+    assert left == right
+    assert left is not right
+    assert left.data is not right.data
+
+def test_list_clear():
+    l = m.List([1])
+    instance_id = id(l)
+    data_id = id(l.data)
+    l.clear()
+    assert id(l) == instance_id
+    assert id(l.data) != data_id
+
 def test_list_imap():
     left = m.List([m.HasTram(-1), m.HasTram(0)])
     left.imap(lambda x: x + 1)
@@ -221,7 +280,7 @@ def test_list_imap():
 #######################
 
 def test_dict_init():
-    d = m.Dict(None)
+    d = m.Dict()
     assert d.data == {}
     d = m.Dict({})
     assert d.data == {}
@@ -245,6 +304,22 @@ def test_dict_setitem():
     left['two'] = 2
     assert left == m.Dict(one=1, two=2)
     assert id(left.data) != _id
+
+def test_dict_clear():
+    d = m.Dict({1 : 1})
+    instance_id = id(d)
+    data_id = id(d.data)
+    d.clear()
+    assert d == {}
+    assert id(d) == instance_id
+    assert id(d.data)!= data_id
+
+def test_dict_copy():
+    left = m.Dict({1 : 1})
+    right = left.copy()
+    assert right == left
+    assert right is not left
+    assert right.data is not left.data
 
 def test_dict_delitem():
     left = m.Dict(one=1, two=2, three=3)
