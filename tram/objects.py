@@ -126,22 +126,22 @@ class HasTram:
         return "{}({})".format(self.__class__.__name__, repr(self.data))
 
     def __lt__(self, other):
-        return self.data <  self.__cast(other)
+        return self.data <  self._cast(other)
 
     def __le__(self, other):
-        return self.data <= self.__cast(other)
+        return self.data <= self._cast(other)
 
     def __eq__(self, other):
-        return self.data == self.__cast(other)
+        return self.data == self._cast(other)
 
     def __gt__(self, other):
-        return self.data >  self.__cast(other)
+        return self.data >  self._cast(other)
 
     def __ge__(self, other):
-        return self.data >= self.__cast(other)
+        return self.data >= self._cast(other)
 
-    def __cast(self, other):
-        return other.data if isinstance(other, self.__class__) else other
+    def _cast(self, other):
+        return other.data if isinstance(other, HasTram) else other
 
     def __contains__(self, item):
         return item in self.data
@@ -149,12 +149,22 @@ class HasTram:
     def __len__(self):
         return len(self.data)
 
+    def __add__(self, other):
+        return self.__class__(self.data + self._cast(other))
+
     def __iadd__(self, other):
         @atomic
         def fun(data, *args, **kwargs):
             return data + other
         do = Action()
         do.transaction(self, write_action=fun)
+        return self
+
+    def __radd__(self, other):
+        return self._cast(other) + self.data
+
+    def __mul__(self, other):
+        return self.__class__(self.data * self._cast(other))
 
     def __imul__(self, other):
         @atomic
@@ -162,9 +172,15 @@ class HasTram:
             return data * other
         do = Action()
         do.transaction(self, write_action=fun)
+        return self
+
+    def __rmul__(self, other):
+        return self._cast(other) * self.data
 
     def __iter__(self):
-        raise NotImplementedError
+        raise NotImplementedError(
+        "iteration is not supported in instances of type {}".format(self.__class__.__name__)
+        )
 
     def __getitem__(self, index):
         return self.data[index]
@@ -205,12 +221,98 @@ class HasTram:
         """
         @atomic
         def fun(*args, **kwargs):
-            return type(self.data()())
+            return type(self.data)()
         do = Action()
         do.transaction(self, write_action=fun)
 
     def copy(self):
         return self.__class__(self.data)
+
+
+class Number(HasTram):
+
+    def __len__(self):
+        raise NotImplementedError(
+        "length is not supported in instances of type {}".format(self.__class__.__name__)
+        )
+
+    def __contains__(self, item):
+        raise NotImplementedError(
+        "containment is not supported in instances of type {}".format(self.__class__.__name__)
+        )
+
+    def __sub__(self, other):
+        return self.__class__(self.data - self._cast(other))
+
+    def __isub__(self, other):
+        @atomic
+        def fun(data):
+            return data - other
+        do = Action()
+        do.transaction(self, write_action=fun)
+        return self
+
+    def __rsub__(self, other):
+        return self._cast(other) - self.data
+
+    def __truediv__(self, other):
+        return Float(self.data / self._cast(other))
+
+    def __itruediv__(self, other):
+        @atomic
+        def fun(data):
+            return data / other
+        do = Action()
+        do.transaction(self, write_action=fun)
+        return self
+
+    def __rtruediv__(self, other):
+        return self._cast(other) / self.data
+
+    def __floordiv__(self, other):
+        return Int(self.data // self._cast(other))
+
+    def __ifloordiv__(self, other):
+        @atomic
+        def fun(data):
+            return data // other
+        do = Action()
+        do.transaction(self, write_action=fun)
+        return self
+
+    def __rfloordiv__(self, other):
+        return self._cast(other) // self.data
+
+    def __mod__(self, other):
+        return Int(self.data % self._cast(other))
+
+    def __pow__(self, other):
+        return self.__class__(self.data ** self._cast(other))
+
+    def __ipow__(self, other):
+        @atomic
+        def fun(data):
+            return data ** other
+        do = Action()
+        do.transaction(self, write_action=fun)
+        return self
+
+    def __rpow__(self, other):
+        return self._cast(other) ** self.data
+
+
+class Int(Number):
+
+    def __init__(self, data=0):
+        data = int(data)
+        super().__init__(data)
+
+
+class Float(Number):
+
+    def __init__(self, data=0.):
+        data = float(data)
+        super().__init__(data)
 
 
 class List(HasTram):
@@ -346,16 +448,12 @@ class List(HasTram):
 
 class Dict(HasTram):
 
-    def __init__(*args, **kwargs):
-        self, *args = args
-        super(Dict, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(Dict, self).__init__(data={})
         if args:
-            data = args[0]
+            self.data.update(args[0])
         elif kwargs:
-            data = kwargs
-        else:
-            data = None
-        self.data = data
+            self.data.update(kwargs)
 
     def __iter__(self):
         return iter(self.keys())
