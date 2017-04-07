@@ -15,6 +15,22 @@ def test_int_init():
     i = m.Int(1.4)
     assert i.data == 1
 
+def test_int_repr():
+    i = m.Int()
+    assert repr(i) == "Int(0)"
+
+def test_int_lt():
+    i = m.Int(3)
+    assert i < 4
+    assert i <= 4
+    assert i <= 3
+
+def test_int_gt():
+    i = m.Int(3)
+    assert i > 2
+    assert i >= 2
+    assert i >= 3
+
 def test_int_add():
     i = m.Int(1)
     assert i + 1 == 2
@@ -60,6 +76,11 @@ def test_int_floordiv():
     assert i == 2
     assert _id == id(i)
 
+def test_int_mod():
+    i = m.Int(5)
+    assert i % 2 == 1
+    assert isinstance(i % 2, m.Int)
+
 def test_int_pow():
     i = m.Int(2)
     assert i ** 3 == 8
@@ -86,6 +107,16 @@ def test_int_len():
     with pytest.raises(NotImplementedError):
         len(i)
 
+def test_int_iter():
+    i = m.Int()
+    with pytest.raises(NotImplementedError):
+        iter(i)
+
+def test_int_version():
+    i = m.Int()
+    with pytest.raises(ValueError):
+        i.version = 0
+
 #################
 # The Float object
 #################
@@ -93,6 +124,10 @@ def test_int_len():
 def test_float_init():
     i = m.Float(1.4)
     assert i.data == 1.4
+
+def test_float_repr():
+    i = m.Float()
+    assert repr(i) == "Float(0.0)"
 
 def test_float_add():
     i = m.Float(1)
@@ -165,12 +200,17 @@ def test_float_len():
     with pytest.raises(NotImplementedError):
         len(i)
 
+def test_float_iter():
+    i = m.Float()
+    with pytest.raises(NotImplementedError):
+        iter(i)
+
 #################
 # The List object
 #################
 
 def test_list_init():
-    l = m.List(None)
+    l = m.List()
     assert l._data == []
     l = m.List([])
     assert l._data == []
@@ -180,6 +220,10 @@ def test_list_init():
     assert l._data is not data
     assert l._locked == False
     assert l.version < time.time()
+
+def test_list_repr():
+    l = m.List()
+    assert repr(l) == "List([])"
 
 def test_list_add():
     left = m.List([-1])
@@ -275,6 +319,27 @@ def test_list_imap():
     left.imap(lambda x: x + 1)
     assert left == [0, 1]
 
+def test_list_iter():
+    l = m.List(range(3))
+    output = list(iter(l))
+    assert output == l
+    assert output is not l
+    assert output is not l.data
+
+def test_list_index():
+    l = m.List([0, 2])
+    output = l.index(2)
+    assert output == 1
+
+def test_list_reverse():
+    l = m.List(range(3))
+    instance_id = id(l)
+    data_id = id(l.data)
+    l.reverse()
+    assert l == [2, 1, 0]
+    assert id(l) == instance_id
+    assert id(l.data) != data_id
+
 #######################
 # The dictionary object
 #######################
@@ -290,6 +355,10 @@ def test_dict_init():
     assert d._data is not data
     assert d._locked == False
     assert d.version < time.time()
+
+def test_dict_repr():
+    d = m.Dict()
+    assert repr(d) == "Dict({})"
 
 def test_dict_getitem():
     left = m.Dict({})
@@ -355,3 +424,9 @@ def test_dict_update():
 def test_dict_values():
     left = m.Dict(one=1, two=2)
     assert sorted(left.values()) == sorted([1, 2])
+
+def test_dict_iter():
+    d = m.Dict({'one' : 1, 'two' : 2})
+    output = list(iter(d))
+    assert sorted(output) == sorted(['one', 'two'])
+    assert output is not d.data
