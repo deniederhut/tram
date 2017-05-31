@@ -20,6 +20,11 @@ class SuccessError(Exception):
     pass
 
 
+class MaxRetryError(Exception):
+    """Raised when retry limit has been passed"""
+    pass
+
+
 class Action:
     """Object which implements TL2 algorithm
     """
@@ -37,6 +42,12 @@ class Action:
         """send logs to the garbage collector"""
         del self.read_log
         del self.write_log
+
+    def decrement_retries(self):
+        if self.retries <= 1:
+            raise MaxRetryError
+        else:
+            self.retries -= 1
 
     def validate(self):
         """Raise exception if any instance reads are no longer valid
@@ -99,7 +110,7 @@ class Action:
                     break
                 finally:
                     self.sequence_unlock(instance_list)
-            retries -= 1
+            self.decrement_retries()
 
     def commit(self):
         """Commit write log to memory"""
